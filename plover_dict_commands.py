@@ -2,6 +2,8 @@
 
 import os
 
+solo_state = [[], False]
+
 
 # Helpers. {{{
 
@@ -43,6 +45,27 @@ def toggle_dictionaries(selections, dictionaries):
         dictionaries[m] = d.replace(enabled=enabled)
     return dictionaries
 
+
+PREVIOUS_DICTIONARIES = 0
+SOLO_ENABLED = 1
+def toggle_solo_dictionaries(selections, engine_dictionaries):
+    if solo_state[SOLO_ENABLED]:
+        solo_dictionaries = engine_dictionaries[:]
+    else:
+        solo_state[PREVIOUS_DICTIONARIES] = engine_dictionaries[:]
+        solo_state[SOLO_ENABLED] = True
+        solo_dictionaries = engine_dictionaries[:]
+        for i, d in enumerate(solo_dictionaries):
+            solo_dictionaries[i] = d.replace(enabled=False)
+
+    solo_dictionaries = toggle_dictionaries(selections, solo_dictionaries)
+    return solo_dictionaries
+
+def restore_dictionaries_after_solo():
+    solo_state[SOLO_ENABLED] = False
+    previous_dictionaries = solo_state[PREVIOUS_DICTIONARIES]
+    solo_state[PREVIOUS_DICTIONARIES] = []
+    return previous_dictionaries
 # }}}
 
 # Commands. {{{
@@ -59,4 +82,15 @@ def toggle_dict(engine, cmdline):
     dictionaries = toggle_dictionaries(selections, dictionaries)
     engine.config = { 'dictionaries': dictionaries }
 
+def solo_dict(engine, cmdline):
+    selections = [path.strip() for path in cmdline.split(',')]
+    dictionaries = engine.config['dictionaries']
+    dictionaries = toggle_solo_dictionaries(selections, dictionaries)
+    engine.config = { 'dictionaries': dictionaries }
+
+def end_solo_dict(engine, cmdline):
+    restored_dictionaries = restore_dictionaries_after_solo()
+    if restored_dictionaries:
+        engine.config = { 'dictionaries': restored_dictionaries }
+    # Only restore the previous list of dictionaries if there's something in it.
 # }}}

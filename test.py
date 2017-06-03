@@ -4,7 +4,9 @@ import unittest
 
 from plover.config import DictionaryConfig
 
-from plover_dict_commands import priority_dict, toggle_dict
+from plover_dict_commands import priority_dict, toggle_dict, \
+                                 solo_dict, end_solo_dict, \
+                                 solo_state, SOLO_ENABLED, PREVIOUS_DICTIONARIES
 
 
 class FakeEngine(object):
@@ -40,6 +42,7 @@ class DictCommandsTest(unittest.TestCase):
             self.english,
             self.spanish,
         ])
+        solo_state[SOLO_ENABLED] = False
 
     def test_priority_dict_shortest_path_is_default(self):
         priority_dict(self.engine, 'main.json')
@@ -96,6 +99,34 @@ class DictCommandsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             toggle_dict(self.engine, '+foobar.json')
 
+    def test_solo_dict(self):
+        solo_dict(self.engine, '+spanish/main.json')
+        self.assertEqual(self.engine.config['dictionaries'], [
+            self.user.replace(enabled=False),
+            self.commands.replace(enabled=False),
+            self.english.replace(enabled=False),
+            self.spanish,
+        ])
+
+    def test_end_solo_dict_restores_previous_state(self):
+        toggle_dict(self.engine, '-main.json')
+        solo_dict(self.engine, '+spanish/main.json')
+        end_solo_dict(self.engine, '')
+        self.assertEqual(self.engine.config['dictionaries'], [
+            self.user,
+            self.commands,
+            self.english.replace(enabled=False),
+            self.spanish,
+        ])
+
+    def test_end_solo_dict_without_first_doing_solo_doesnt_destroy_list_of_dictionaries(self):
+        end_solo_dict(self.engine, '')
+        self.assertEqual(self.engine.config['dictionaries'], [
+            self.user,
+            self.commands,
+            self.english,
+            self.spanish,
+        ])
 
 if __name__ == '__main__':
     unittest.main()
