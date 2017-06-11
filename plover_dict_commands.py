@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
+import atexit
+import json
 import os
 
-solo_state = [[], False]
-
+from plover.config import DictionaryConfig
+from plover.oslayer.config import CONFIG_DIR
 
 # Helpers. {{{
 
@@ -46,13 +48,65 @@ def toggle_dictionaries(selections, dictionaries):
     return dictionaries
 
 
+BACKUP_DICTIONARY_PATH = os.path.join(CONFIG_DIR, "solo_mode_dictionary_backup.json")
+
 PREVIOUS_DICTIONARIES = 0
 SOLO_ENABLED = 1
+SOLO_DICT_HAS_RUN = 2
+solo_state = [[], False, False]
+
+# solo_dict safety guards, restores old dictionary stack state if Plover is closed
+# before exiting the temporary mode.
+
+def load_dictionary_stack_from_backup(path):
+    try:
+        with open(path, 'r') as f:
+            dictionaries = json.load(f)
+        if dictionaries:
+            old_dictionaries = [DictionaryConfig(x[0], x[1]) for x in dictionaries]
+            os.remove(BACKUP_DICTIONARY_PATH) #backup recovered, delete file
+            return old_dictionaries
+        else:
+            return None
+    except FileNotFoundError:
+        # No backup file, no problem
+        return None
+
+def backup_dictionary_stack(dictionaries, path):
+    if dictionaries:
+        with open(path, 'w') as f:
+            json.dump(dictionaries, f)
+    else:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass #Good, we didn't want it anyway!
+
+def backup_if_solo_enabled():
+    print("exiting")
+    import pdb;pdb.set_trace()
+    if solo_state[SOLO_ENABLED]:
+        backup_dictionary_stack(solo_state[PREVIOUS_DICTIONARIES], BACKUP_DICTIONARY_PATH)
+
+#print("registering function")
+#input()
+#atexit.register(backup_if_solo_enabled)
+
 def toggle_solo_dictionaries(selections, engine_dictionaries):
+    # Load persisted dictionaries from last time Plover was open,
+    # if applicable.
+    if not solo_state[SOLO_DICT_HAS_RUN]:
+        solo_state[SOLO_DICT_HAS_RUN] = True
+        persisted_dictionaries = load_dictionary_stack_from_backup(BACKUP_DICTIONARY_PATH)
+        if persisted_dictionaries:
+            solo_state[PREVIOUS_DICTIONARIES] = persisted_dictionaries 
+            solo_state[SOLO_ENABLED] = True
+
     if solo_state[SOLO_ENABLED]:
         solo_dictionaries = engine_dictionaries[:]
     else:
         solo_state[PREVIOUS_DICTIONARIES] = engine_dictionaries[:]
+        backup_dictionary_stack(solo_state[PREVIOUS_DICTIONARIES], BACKUP_DICTIONARY_PATH)
         solo_state[SOLO_ENABLED] = True
         solo_dictionaries = engine_dictionaries[:]
         for i, d in enumerate(solo_dictionaries):
@@ -63,9 +117,21 @@ def toggle_solo_dictionaries(selections, engine_dictionaries):
 
 def restore_dictionaries_after_solo():
     solo_state[SOLO_ENABLED] = False
-    previous_dictionaries = solo_state[PREVIOUS_DICTIONARIES]
+    if solo_state[SOLO_DICT_HAS_RUN]:
+        previous_dictionaries = solo_state[PREVIOUS_DICTIONARIES]
+    else:
+        # We're disabling a temporary mode before enabling one? See if there's
+        # a backup dictionary stack from last Plover session before clobbering
+        # the user's normal dictionary state.
+        backed_up_dictionaries = load_dictionary_stack_from_backup(BACKUP_DICTIONARY_PATH)
+        if backed_up_dictionaries:
+            previous_dictionaries = backed_up_dictionaries
+        else:
+            previous_dictionaries = None
+        
     solo_state[PREVIOUS_DICTIONARIES] = []
     return previous_dictionaries
+
 # }}}
 
 # Commands. {{{
@@ -92,5 +158,5 @@ def end_solo_dict(engine, cmdline):
     restored_dictionaries = restore_dictionaries_after_solo()
     if restored_dictionaries:
         engine.config = { 'dictionaries': restored_dictionaries }
-    # Only restore the previous list of dictionaries if there's something in it.
+    backup_dictionary_stack(None, BACKUP_DICTIONARY_PATH)
 # }}}

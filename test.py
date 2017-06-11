@@ -1,12 +1,18 @@
 #!/usr/bin/env python
 
+import os
 import unittest
 
-from plover.config import DictionaryConfig
+import plover_dict_commands as pdc
 
+from plover.config import DictionaryConfig
+from plover.oslayer.config import CONFIG_DIR
 from plover_dict_commands import priority_dict, toggle_dict, \
                                  solo_dict, end_solo_dict, \
-                                 solo_state, SOLO_ENABLED, PREVIOUS_DICTIONARIES
+                                 solo_state, SOLO_ENABLED, PREVIOUS_DICTIONARIES, \
+                                 SOLO_DICT_HAS_RUN, \
+                                 backup_dictionary_stack, \
+                                 load_dictionary_stack_from_backup
 
 
 class FakeEngine(object):
@@ -43,6 +49,9 @@ class DictCommandsTest(unittest.TestCase):
             self.spanish,
         ])
         solo_state[SOLO_ENABLED] = False
+        solo_state[SOLO_DICT_HAS_RUN] = False
+        pdc.BACKUP_DICTIONARY_PATH = \
+                os.path.join(CONFIG_DIR, "dummy_backup.json")
 
     def test_priority_dict_shortest_path_is_default(self):
         priority_dict(self.engine, 'main.json')
@@ -108,7 +117,47 @@ class DictCommandsTest(unittest.TestCase):
             self.spanish,
         ])
 
+    def test_backup_dictionaries_to_json_and_reload(self):
+        original_dictionaries = self.engine.config['dictionaries']
+        #import pdb; pdb.set_trace()
+        backup_dictionary_stack(original_dictionaries, pdc.BACKUP_DICTIONARY_PATH)
+        toggle_dict(self.engine, '-main.json')
+        self.assertEqual(self.engine.config['dictionaries'], [
+            self.user,
+            self.commands,
+            self.english.replace(enabled=False), # turned off
+            self.spanish,
+        ])
+        restored_dictionaries = load_dictionary_stack_from_backup(pdc.BACKUP_DICTIONARY_PATH)
+        self.engine.config = { 'dictionaries': restored_dictionaries }
+        self.assertEqual(self.engine.config['dictionaries'], [
+            self.user,
+            self.commands,
+            self.english,  # turned back on again after restore
+            self.spanish,
+        ])
+        backup_dictionary_stack([], pdc.BACKUP_DICTIONARY_PATH)
+        #clear the file for the next test
+
+    def test_backed_up_dictionaries_restored_after_solo_if_backup_exists(self):
+        toggle_dict(self.engine, '-main.json') #turned off before backup...
+        original_dictionaries = self.engine.config['dictionaries']
+        backup_dictionary_stack(original_dictionaries, pdc.BACKUP_DICTIONARY_PATH)
+        toggle_dict(self.engine, '+main.json') #but normal before solo_dict
+
+        #Now that there's a backup file, do the first solo_dict since we've run...
+        solo_dict(self.engine, '+spanish/main.json')
+        end_solo_dict(self.engine, '')
+
+        self.assertEqual(self.engine.config['dictionaries'], [
+            self.user,
+            self.commands,
+            self.english.replace(enabled=False),  # turned back off again after restore
+            self.spanish,
+        ])
+
     def test_end_solo_dict_restores_previous_state(self):
+        print(self.engine.config['dictionaries'])
         toggle_dict(self.engine, '-main.json')
         solo_dict(self.engine, '+spanish/main.json')
         end_solo_dict(self.engine, '')
@@ -127,6 +176,9 @@ class DictCommandsTest(unittest.TestCase):
             self.english,
             self.spanish,
         ])
+
+        
+
 
 if __name__ == '__main__':
     unittest.main()
