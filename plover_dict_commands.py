@@ -68,7 +68,7 @@ def load_dictionary_stack_from_backup(path):
             return old_dictionaries
         else:
             return None
-    except FileNotFoundError:
+    except IOError:
         # No backup file, no problem
         return None
 
@@ -79,18 +79,8 @@ def backup_dictionary_stack(dictionaries, path):
     else:
         try:
             os.remove(path)
-        except FileNotFoundError:
+        except OSError:
             pass #Good, we didn't want it anyway!
-
-def backup_if_solo_enabled():
-    print("exiting")
-    import pdb;pdb.set_trace()
-    if solo_state[SOLO_ENABLED]:
-        backup_dictionary_stack(solo_state[PREVIOUS_DICTIONARIES], BACKUP_DICTIONARY_PATH)
-
-#print("registering function")
-#input()
-#atexit.register(backup_if_solo_enabled)
 
 def toggle_solo_dictionaries(selections, engine_dictionaries):
     # Load persisted dictionaries from last time Plover was open,
