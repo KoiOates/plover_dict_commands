@@ -66,7 +66,7 @@ def load_dictionary_stack_from_backup(path):
             except json.JSONDecodeError:
                 dictionaries = None
         if dictionaries:
-            old_dictionaries = [DictionaryConfig(x[0], x[1]) for x in dictionaries]
+            old_dictionaries = [DictionaryConfig.from_dict(x) for x in dictionaries]
             os.remove(path) #backup recovered, delete file
             return old_dictionaries
         else:
@@ -78,7 +78,7 @@ def load_dictionary_stack_from_backup(path):
 def backup_dictionary_stack(dictionaries, path):
     if dictionaries:
         with open(path, 'w') as f:
-            json.dump(dictionaries, f)
+            json.dump([DictionaryConfig.to_dict(d) for d in dictionaries], f)
     else:
         try:
             os.remove(path)
