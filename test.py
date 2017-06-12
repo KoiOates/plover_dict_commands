@@ -43,6 +43,7 @@ class DictCommandsTest(unittest.TestCase):
         self.english = DictionaryConfig('main.json')
         self.commands = DictionaryConfig('commands.json')
         self.user = DictionaryConfig('user.json')
+        self.extra = DictionaryConfig('extra.json')
         self.engine = FakeEngine([
             self.user,
             self.commands,
@@ -126,6 +127,20 @@ class DictCommandsTest(unittest.TestCase):
             self.english.replace(enabled=False),
             self.spanish,
         ])
+
+    def test_end_solo_dict_doesnt_delete_new_dictionaries(self):
+        solo_dict(self.engine, '+spanish/main.json')
+        # ...then load a new dictionary while in the temporary mode
+        self.engine.config['dictionaries'].append(self.extra)
+        end_solo_dict(self.engine, '')
+        self.assertEqual(self.engine.config['dictionaries'], [
+            self.user,
+            self.commands,
+            self.english,
+            self.spanish,
+            self.extra,
+        ])
+        pass
 
     def test_backup_dictionaries_to_json_and_reload(self):
         original_dictionaries = self.engine.config['dictionaries']
