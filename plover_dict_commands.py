@@ -61,10 +61,13 @@ solo_state = [[], False, False]
 def load_dictionary_stack_from_backup(path):
     try:
         with open(path, 'r') as f:
-            dictionaries = json.load(f)
+            try:
+                dictionaries = json.load(f)
+            except json.JSONDecodeError:
+                dictionaries = None
         if dictionaries:
             old_dictionaries = [DictionaryConfig(x[0], x[1]) for x in dictionaries]
-            os.remove(BACKUP_DICTIONARY_PATH) #backup recovered, delete file
+            os.remove(path) #backup recovered, delete file
             return old_dictionaries
         else:
             return None

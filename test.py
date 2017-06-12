@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import tempfile
 import unittest
 
 import plover_dict_commands as pdc
@@ -50,8 +51,17 @@ class DictCommandsTest(unittest.TestCase):
         ])
         solo_state[SOLO_ENABLED] = False
         solo_state[SOLO_DICT_HAS_RUN] = False
-        pdc.BACKUP_DICTIONARY_PATH = \
-                os.path.join(CONFIG_DIR, "dummy_backup.json")
+        self.tf = tempfile.NamedTemporaryFile(delete=False)
+        pdc.BACKUP_DICTIONARY_PATH = self.tf.name
+
+    def tearDown(self):
+        try:
+            os.unlink(self.tf.name)
+        except OSError:
+            # This file gets deleted by the module being tested right now,
+            # leave this here in case that changes to delete temp file
+            # if necessary.
+            pass
 
     def test_priority_dict_shortest_path_is_default(self):
         priority_dict(self.engine, 'main.json')
