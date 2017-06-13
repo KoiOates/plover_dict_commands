@@ -19,23 +19,21 @@ from plover_dict_commands import priority_dict, toggle_dict, \
 class FakeEngine(object):
 
     def __init__(self, dictionaries):
-        self._config_extras = {
+        self._config = {
             'one_setting': 'foobar',
             'another_setting': 42,
+            'dictionaries': dictionaries,
         }
-        self._dictionaries = list(dictionaries)
 
     @property
     def config(self):
-        d = dict(self._config_extras)
-        d['dictionaries'] = list(self._dictionaries)
-        return d
+        return self._config
 
     @config.setter
     def config(self, config_update):
         # Only 'dictionaries' can be changed.
         assert list(config_update.keys()) == ['dictionaries']
-        self._dictionaries = list(config_update['dictionaries'])
+        self._config.update(config_update)
 
 
 class DictCommandsTest(unittest.TestCase):
@@ -133,9 +131,7 @@ class DictCommandsTest(unittest.TestCase):
     def test_end_solo_dict_doesnt_delete_new_dictionaries(self):
         solo_dict(self.engine, '+spanish/main.json')
         # ...then load a new dictionary while in the temporary mode
-        dictionaries = self.engine.config['dictionaries']
-        dictionaries.append(self.extra)
-        self.engine.config = { 'dictionaries': dictionaries }
+        self.engine.config['dictionaries'].append(self.extra)
         end_solo_dict(self.engine, '')
         self.assertEqual(self.engine.config['dictionaries'], [
             self.user,
@@ -186,6 +182,7 @@ class DictCommandsTest(unittest.TestCase):
         ])
 
     def test_end_solo_dict_restores_previous_state(self):
+        print(self.engine.config['dictionaries'])
         toggle_dict(self.engine, '-main.json')
         solo_dict(self.engine, '+spanish/main.json')
         end_solo_dict(self.engine, '')
@@ -196,31 +193,16 @@ class DictCommandsTest(unittest.TestCase):
             self.spanish,
         ])
 
-    def test_end_solo_dict_without_first_doing_solo_1(self):
-        backup_dictionary_stack([
-            self.spanish.replace(enabled=False),
-            self.user.replace(enabled=False),
-        ], pdc.BACKUP_DICTIONARY_PATH)
-        end_solo_dict(self.engine, '')
-        self.assertEqual(self.engine.config['dictionaries'], [
-            self.user.replace(enabled=False),
-            self.commands,
-            self.english,
-            self.spanish.replace(enabled=False),
-        ])
-
-    def test_end_solo_dict_without_first_doing_solo_2(self):
-        backup_dictionary_stack([
-            self.extra,
-            self.english.replace(enabled=False),
-        ], pdc.BACKUP_DICTIONARY_PATH)
+    def test_end_solo_dict_without_first_doing_solo_doesnt_destroy_list_of_dictionaries(self):
         end_solo_dict(self.engine, '')
         self.assertEqual(self.engine.config['dictionaries'], [
             self.user,
             self.commands,
-            self.english.replace(enabled=False),
+            self.english,
             self.spanish,
         ])
+
+        
 
 
 if __name__ == '__main__':
