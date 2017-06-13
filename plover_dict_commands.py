@@ -150,12 +150,16 @@ def solo_dict(engine, cmdline):
 def end_solo_dict(engine, cmdline):
     restored_dictionaries = restore_dictionaries_after_solo()
     if restored_dictionaries:
-        engine_dictionary_paths = [x.path for x in engine.config['dictionaries']]
-        for path, enabled in [(x.path, x.enabled) for x in restored_dictionaries]:
-            if path in engine_dictionary_paths:
-                ix = engine_dictionary_paths.index(path)
-                engine.config['dictionaries'][ix] = \
-                        DictionaryConfig(path = path, enabled = enabled)
-            
+        enabled = {
+            d.path: d.enabled
+            for d in restored_dictionaries
+        }
+        engine.config = {
+            'dictionaries': (
+                d.replace(enabled=enabled.get(d.path, d.enabled))
+                for d in engine.config['dictionaries']
+            )
+        }
     backup_dictionary_stack(None, BACKUP_DICTIONARY_PATH)
+
 # }}}
